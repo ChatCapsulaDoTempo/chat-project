@@ -25,7 +25,6 @@
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
         }
         
-        /* Otimização para Tela Cheia no Celular e PC */
         body, html { 
             background: var(--bg-main); 
             height: 100%; 
@@ -40,7 +39,7 @@
             background: var(--bg-container); 
             width: 100%; 
             height: 100%; 
-            max-width: 500px; /* Limita a largura no PC para parecer um celular */
+            max-width: 500px; 
             display: flex; 
             flex-direction: column; 
             overflow: hidden; 
@@ -100,12 +99,11 @@
             white-space: nowrap; 
         }
         
-        /* Área das Mensagens (Estilo WhatsApp) */
         #messages { 
             flex: 1; 
             padding: 16px; 
             overflow-y: auto; 
-            background-color: var(--bg-main); /* Fundo Preto solicitado */
+            background-color: var(--bg-main); 
             background-image: radial-gradient(var(--border) 1px, transparent 0); 
             background-size: 20px 20px; 
             display: flex; 
@@ -113,7 +111,6 @@
             gap: 8px; 
         }
         
-        /* Balões de Mensagem Avançados */
         .msg-wrapper { 
             display: flex; 
             flex-direction: column; 
@@ -127,7 +124,7 @@
         
         .msg-author { 
             font-size: 12px; 
-            color: var(--blue-light); /* Nome em Azul Claro */
+            color: var(--blue-light); 
             font-weight: 600;
             margin-left: 4px; 
             margin-bottom: 2px; 
@@ -149,11 +146,10 @@
             border-top-left-radius: 0; 
         }
         .out .msg-box { 
-            background: var(--msg-out); /* Azul Escuro */
+            background: var(--msg-out); 
             border-top-right-radius: 0; 
         }
 
-        /* Estilo do Player de Áudio adaptado para o tema escuro */
         audio {
             max-width: 240px;
             height: 40px;
@@ -161,7 +157,6 @@
             outline: none;
         }
 
-        /* Data e Hora dentro do balão */
         .msg-time {
             position: absolute;
             bottom: 3px;
@@ -171,7 +166,6 @@
             opacity: 0.8;
         }
         
-        /* Inputs e Botões Estilizados */
         input { 
             width: 100%; 
             padding: 14px; 
@@ -199,7 +193,6 @@
         }
         button:hover { opacity: 0.9; }
         
-        /* Rodapé de digitação estilo WhatsApp */
         .chat-input-area { 
             padding: 10px; 
             background: #111b21; 
@@ -227,7 +220,6 @@
             justify-content: center;
         }
 
-        /* Botão do microfone dinâmico */
         #btn-audio {
             background: #202c33;
             color: #aebac1;
@@ -259,7 +251,7 @@
         <div id="auth-container">
             <h2>Entrar no Chat</h2>
             <input type="text" id="student-name" placeholder="Digite seu nome...">
-            <button onclick="login()">Entrar no Chat</button>
+            <button id="btn-entrar" onclick="login()">Entrar no Chat</button>
         </div>
 
         <div id="chat-container" class="hidden">
@@ -279,22 +271,27 @@
     </div>
 
     <script>
-        // =================================================================
-        // Link de conexão com o seu Google Apps Script
-        // =================================================================
         const URL_DO_SCRIPT = "https://script.google.com/macros/s/AKfycbxcB6DJdBFsfKhLTadjzynv2flHjComA0Yp5GwuFmW2UgcyItSIcMGlmSIC00A3cCiLTA/exec";
         
         let usuarioLogado = "";
         let temporizadorChat = null;
         
-        // Variáveis de controle do Gravador
+        // Inicializadores do gravador vazios para evitar falhas no carregamento da página
         let mediaRecorder = null;
         let pedacosAudio = [];
         let gravando = false;
 
-        // Listener para permitir entrar apertando Enter na tela de login
-        document.getElementById('student-name').addEventListener('keydown', function(e) {
-            if (e.key === 'Enter') login();
+        // Garante que o evento do Enter no login funcione de forma segura
+        document.addEventListener("DOMContentLoaded", () => {
+            const inputNome = document.getElementById('student-name');
+            if(inputNome) {
+                inputNome.addEventListener('keydown', function(e) {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        login();
+                    }
+                });
+            }
         });
 
         function login() {
@@ -306,8 +303,10 @@
                 document.getElementById('chat-container').classList.remove('hidden');
                 document.getElementById('user-display').innerText = nomeInput;
                 
-                const msgInput = document.getElementById('msg-input');
-                msgInput.focus();
+                setTimeout(() => {
+                    const msgInput = document.getElementById('msg-input');
+                    if(msgInput) msgInput.focus();
+                }, 100);
                 
                 atualizarChat();
                 temporizadorChat = setInterval(atualizarChat, 3000);
@@ -316,7 +315,6 @@
             }
         }
 
-        // Formata a data/hora para o padrão do balão (HH:MM)
         function formatarHora(stringData) {
             try {
                 const data = new Date(stringData);
@@ -332,10 +330,7 @@
 
         async function atualizarChat() {
             const msgArea = document.getElementById('messages');
-            if (URL_DO_SCRIPT === "COLE_AQUI_A_SUA_URL_DO_WEB_APP") {
-                msgArea.innerHTML = "<p style='color:red; text-align:center;'>Erro: Insira a URL do Script!</p>";
-                return;
-            }
+            if (!msgArea) return;
 
             try {
                 const response = await fetch(URL_DO_SCRIPT);
@@ -343,8 +338,9 @@
                 
                 msgArea.innerHTML = ''; 
                 
-                if(dados.length === 0) {
+                if(!dados || dados.length === 0) {
                     msgArea.innerHTML = '<p style="color:var(--text-sub); text-align:center; font-size:14px; margin-top:20px;">Nenhuma mensagem por enquanto...</p>';
+                    return;
                 }
 
                 dados.forEach(item => {
@@ -360,14 +356,14 @@
                     const box = document.createElement('div');
                     box.className = 'msg-box';
 
-                    // VERIFICAÇÃO: Se a mensagem começar com o identificador de áudio Base64
-                    if (item.mensagem.startsWith("data:audio/")) {
+                    if (item.mensagem && item.mensagem.startsWith("data:audio/")) {
                         const audioPlayer = document.createElement('audio');
                         audioPlayer.src = item.mensagem;
                         audioPlayer.controls = true;
+                        audioPlayer.preload = "metadata";
                         box.appendChild(audioPlayer);
                     } else {
-                        box.innerText = item.mensagem;
+                        box.innerText = item.mensagem || "";
                     }
                     
                     const timeSpan = document.createElement('span');
@@ -388,15 +384,15 @@
 
         async function sendMessage() {
             const input = document.getElementById('msg-input');
-            const texto = input.value.trim();
+            if(!input) return;
             
+            const texto = input.value.trim();
             if(!texto) return;
             input.value = '';
 
             await enviarDadoBruto(texto);
         }
 
-        // Função isolada para disparar requisições POST para o Google Script
         async function enviarDadoBruto(conteudoMensagem) {
             const dadosEnvio = {
                 nome: usuarioLogado,
@@ -407,4 +403,67 @@
             try {
                 await fetch(URL_DO_SCRIPT, {
                     method: 'POST',
-                    mode: 'no-
+                    mode: 'no-cors',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(dadosEnvio)
+                });
+                atualizarChat();
+            } catch (erro) {
+                console.error("Erro ao enviar:", erro);
+            }
+        }
+
+        // Sistema de gravação com travas de segurança contra travamentos de tela
+        async function toggleAudioRecord() {
+            const btnAudio = document.getElementById('btn-audio');
+            if(!btnAudio) return;
+            
+            if (!gravando) {
+                pedacosAudio = [];
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    mediaRecorder = new MediaRecorder(stream);
+                    
+                    mediaRecorder.ondataavailable = event => {
+                        if (event.data && event.data.size > 0) pedacosAudio.push(event.data);
+                    };
+
+                    mediaRecorder.onstop = async () => {
+                        if (pedacosAudio.length === 0) return;
+                        
+                        const audioBlob = new Blob(pedacosAudio, { type: 'audio/webm' });
+                        const reader = new FileReader();
+                        reader.readAsDataURL(audioBlob);
+                        reader.onloadend = async () => {
+                            const base64Audio = reader.result;
+                            await enviarDadoBruto(base64Audio);
+                        };
+
+                        stream.getTracks().forEach(track => track.stop());
+                    };
+
+                    mediaRecorder.start();
+                    gravando = true;
+                    btnAudio.innerText = "🛑";
+                    btnAudio.classList.add('recording');
+                } catch (err) {
+                    alert("Por favor, permita o acesso ao microfone nas configurações do seu navegador.");
+                    console.error(err);
+                }
+            } else {
+                if(mediaRecorder && mediaRecorder.state !== "inactive") {
+                    mediaRecorder.stop();
+                }
+                gravando = false;
+                btnAudio.innerText = "🎤";
+                btnAudio.classList.remove('recording');
+            }
+        }
+
+        function logout() {
+            if(temporizadorChat) clearInterval(temporizadorChat);
+            location.reload();
+        }
+    </script>
+</body>
+</html>
