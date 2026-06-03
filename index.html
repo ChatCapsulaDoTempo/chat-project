@@ -15,6 +15,7 @@
             --border: #222e35;           /* Linhas divisórias */
             --msg-in: #1f2c34;           /* Balão recebido (Cinza azulado escuro) */
             --msg-out: #0a4d68;          /* Balão enviado (Azul Escuro Adaptado) */
+            --recording: #ea4335;        /* Vermelho para gravação ativa */
         }
 
         * { 
@@ -152,6 +153,14 @@
             border-top-right-radius: 0; 
         }
 
+        /* Estilo do Player de Áudio adaptado para o tema escuro */
+        audio {
+            max-width: 240px;
+            height: 40px;
+            margin-top: 4px;
+            outline: none;
+        }
+
         /* Data e Hora dentro do balão */
         .msg-time {
             position: absolute;
@@ -213,6 +222,20 @@
             border-radius: 24px; 
             background: var(--blue-dark);
             color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* Botão do microfone dinâmico */
+        #btn-audio {
+            background: #202c33;
+            color: #aebac1;
+        }
+        #btn-audio.recording {
+            background: var(--recording);
+            color: white;
+            animation: pulse 1.2s infinite;
         }
         
         .btn-logout { 
@@ -227,6 +250,7 @@
         }
 
         @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.6; } 100% { opacity: 1; } }
     </style>
 </head>
 <body>
@@ -248,6 +272,7 @@
             
             <div class="chat-input-area">
                 <input type="text" id="msg-input" placeholder="Digite sua mensagem aqui..." onkeydown="if(event.key === 'Enter') sendMessage()">
+                <button id="btn-audio" onclick="toggleAudioRecord()">🎤</button>
                 <button onclick="sendMessage()">Enviar</button>
             </div>
         </div>
@@ -261,6 +286,11 @@
         
         let usuarioLogado = "";
         let temporizadorChat = null;
+        
+        // Variáveis de controle do Gravador
+        let mediaRecorder = null;
+        let pedacosAudio = [];
+        let gravando = false;
 
         // Listener para permitir entrar apertando Enter na tela de login
         document.getElementById('student-name').addEventListener('keydown', function(e) {
@@ -329,7 +359,16 @@
                     
                     const box = document.createElement('div');
                     box.className = 'msg-box';
-                    box.innerText = item.mensagem;
+
+                    // VERIFICAÇÃO: Se a mensagem começar com o identificador de áudio Base64
+                    if (item.mensagem.startsWith("data:audio/")) {
+                        const audioPlayer = document.createElement('audio');
+                        audioPlayer.src = item.mensagem;
+                        audioPlayer.controls = true;
+                        box.appendChild(audioPlayer);
+                    } else {
+                        box.innerText = item.mensagem;
+                    }
                     
                     const timeSpan = document.createElement('span');
                     timeSpan.className = 'msg-time';
@@ -354,30 +393,18 @@
             if(!texto) return;
             input.value = '';
 
+            await enviarDadoBruto(texto);
+        }
+
+        // Função isolada para disparar requisições POST para o Google Script
+        async function enviarDadoBruto(conteudoMensagem) {
             const dadosEnvio = {
                 nome: usuarioLogado,
-                mensagem: texto,
+                mensagem: conteudoMensagem,
                 data: new Date().toISOString()
             };
 
             try {
                 await fetch(URL_DO_SCRIPT, {
                     method: 'POST',
-                    mode: 'no-cors',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(dadosEnvio)
-                });
-                
-                atualizarChat();
-            } catch (erro) {
-                console.error("Erro ao enviar:", erro);
-            }
-        }
-
-        function logout() {
-            if(temporizadorChat) clearInterval(temporizadorChat);
-            location.reload();
-        }
-    </script>
-</body>
-</html>
+                    mode: 'no-
