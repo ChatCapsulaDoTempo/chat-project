@@ -6,16 +6,16 @@
     <title>Chat da Sala</title>
     <style>
         :root {
-            --bg-main: #000000;          /* Fundo geral (Preto) */
-            --bg-container: #0b141a;     /* Fundo do chat estilo WhatsApp escuro */
-            --blue-dark: #075e54;        /* Azul Escuro (Balão enviado / Destaques) */
-            --blue-light: #86c5da;       /* Azul Claro (Textos principais / Nomes) */
-            --text-msg: #e9edef;         /* Cor do texto dentro dos balões */
-            --text-sub: #667781;         /* Cor secundária (Horários) */
-            --border: #222e35;           /* Linhas divisórias */
-            --msg-in: #1f2c34;           /* Balão recebido (Cinza azulado escuro) */
-            --msg-out: #0a4d68;          /* Balão enviado (Azul Escuro Adaptado) */
-            --recording: #ea4335;        /* Vermelho para gravação ativa */
+            --bg-main: #000000;          
+            --bg-container: #0b141a;     
+            --blue-dark: #075e54;        
+            --blue-light: #86c5da;       
+            --text-msg: #e9edef;         
+            --text-sub: #667781;         
+            --border: #222e35;           
+            --msg-in: #1f2c34;           
+            --msg-out: #0a4d68;          
+            --recording: #ea4335;        
         }
 
         * { 
@@ -111,16 +111,24 @@
             gap: 8px; 
         }
         
+        /* Estrutura externa para acomodar o balão + botão de lixeira */
+        .msg-row {
+            display: flex;
+            width: 100%;
+            align-items: center;
+            gap: 8px;
+        }
+        .msg-row.out { justify-content: flex-end; }
+        .msg-row.in { justify-content: flex-start; }
+
         .msg-wrapper { 
             display: flex; 
             flex-direction: column; 
-            max-width: 85%; 
+            max-width: 80%; 
             width: fit-content; 
             animation: fadeIn 0.15s ease-out; 
             position: relative;
         }
-        .msg-wrapper.out { align-self: flex-end; }
-        .msg-wrapper.in { align-self: flex-start; }
         
         .msg-author { 
             font-size: 12px; 
@@ -129,10 +137,10 @@
             margin-left: 4px; 
             margin-bottom: 2px; 
         }
-        .out .msg-author { display: none; } 
+        .msg-row.out .msg-author { display: none; } 
 
         .msg-box { 
-            padding: 8px 12px 18px 12px; 
+            padding: 8px 12px 22px 12px; 
             border-radius: 12px; 
             font-size: 15px; 
             line-height: 1.4; 
@@ -141,17 +149,17 @@
             position: relative;
             color: var(--text-msg);
         }
-        .in .msg-box { 
+        .msg-row.in .msg-box { 
             background: var(--msg-in); 
             border-top-left-radius: 0; 
         }
-        .out .msg-box { 
+        .msg-row.out .msg-box { 
             background: var(--msg-out); 
             border-top-right-radius: 0; 
         }
 
         audio {
-            max-width: 240px;
+            max-width: 220px;
             height: 40px;
             margin-top: 4px;
             outline: none;
@@ -164,6 +172,27 @@
             font-size: 10px;
             color: var(--blue-light);
             opacity: 0.8;
+        }
+
+        /* Botão da Lixeira (Oculto por padrão, aparece ao passar o mouse ou focar) */
+        .btn-delete {
+            background: transparent;
+            color: #ef5350;
+            border: none;
+            cursor: pointer;
+            font-size: 14px;
+            padding: 5px;
+            width: auto;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.2s;
+            opacity: 0.6;
+        }
+        .btn-delete:hover {
+            background: rgba(239, 83, 80, 0.1);
+            opacity: 1;
         }
         
         input { 
@@ -275,13 +304,12 @@
         
         let usuarioLogado = "";
         let temporizadorChat = null;
+        let listaMensagensLocais = []; // Guarda o histórico para renderização incremental inteligente
         
-        // Inicializadores do gravador vazios para evitar falhas no carregamento da página
         let mediaRecorder = null;
         let pedacosAudio = [];
         let gravando = false;
 
-        // Garante que o evento do Enter no login funcione de forma segura
         document.addEventListener("DOMContentLoaded", () => {
             const inputNome = document.getElementById('student-name');
             if(inputNome) {
@@ -308,6 +336,11 @@
                     if(msgInput) msgInput.focus();
                 }, 100);
                 
+                // Reseta a lista ao entrar para garantir sincronia limpa
+                listaMensagensLocais = [];
+                const msgArea = document.getElementById('messages');
+                if(msgArea) msgArea.innerHTML = '';
+
                 atualizarChat();
                 temporizadorChat = setInterval(atualizarChat, 3000);
             } else {
@@ -328,26 +361,48 @@
             }
         }
 
+        // Nova engenharia de sincronização: Não limpa a tela se não houver mudanças reais estruturais
         async function atualizarChat() {
             const msgArea = document.getElementById('messages');
             if (!msgArea) return;
 
             try {
                 const response = await fetch(URL_DO_SCRIPT);
-                const dados = await response.json();
+                const dadosServidor = await response.json();
                 
-                msgArea.innerHTML = ''; 
-                
-                if(!dados || dados.length === 0) {
-                    msgArea.innerHTML = '<p style="color:var(--text-sub); text-align:center; font-size:14px; margin-top:20px;">Nenhuma mensagem por enquanto...</p>';
+                if(!dadosServidor || dadosServidor.length === 0) {
+                    if(msgArea.children.length === 0) {
+                        msgArea.innerHTML = '<p id="no-msg" style="color:var(--text-sub); text-align:center; font-size:14px; margin-top:20px;">Nenhuma mensagem por enquanto...</p>';
+                    }
                     return;
                 }
 
-                dados.forEach(item => {
+                const noMsgTxt = document.getElementById('no-msg');
+                if(noMsgTxt) noMsgTxt.remove();
+
+                // Filtra e pega apenas itens novos comparando o tamanho ou o índice cronológico
+                let indexInicial = listaMensagensLocais.length;
+                
+                if (dadosServidor.length < listaMensagensLocais.length) {
+                    // Se o banco reduziu drasticamente por intervenção externa, reconstrói de forma segura
+                    msgArea.innerHTML = '';
+                    listaMensagensLocais = [];
+                    indexInicial = 0;
+                }
+
+                for (let i = indexInicial; i < dadosServidor.length; i++) {
+                    const item = dadosServidor[i];
+                    listaMensagensLocais.push(item);
+                    
                     const eMinha = item.nome === usuarioLogado;
                     
+                    // Container da linha estrutural
+                    const row = document.createElement('div');
+                    row.className = `msg-row ${eMinha ? 'out' : 'in'}`;
+                    row.setAttribute('data-index', i);
+                    
                     const wrapper = document.createElement('div');
-                    wrapper.className = `msg-wrapper ${eMinha ? 'out' : 'in'}`;
+                    wrapper.className = 'msg-wrapper';
                     
                     const author = document.createElement('div');
                     author.className = 'msg-author';
@@ -373,12 +428,32 @@
                     box.appendChild(timeSpan);
                     wrapper.appendChild(author);
                     wrapper.appendChild(box);
-                    msgArea.appendChild(wrapper);
-                });
-                
-                msgArea.scrollTop = msgArea.scrollHeight; 
+                    
+                    // Adiciona o botão da lixeira individual
+                    const btnDelete = document.createElement('button');
+                    btnDelete.className = 'btn-delete';
+                    btnDelete.innerHTML = '🗑️';
+                    btnDelete.title = 'Apagar mensagem';
+                    btnDelete.onclick = function() {
+                        if(confirm("Deseja apagar esta mensagem da sua visualização?")) {
+                            row.remove();
+                        }
+                    };
+
+                    // Ordem visual correta dos elementos dependendo de quem enviou
+                    if(eMinha) {
+                        row.appendChild(btnDelete); // Lixeira vem antes do balão na direita
+                        row.appendChild(wrapper);
+                    } else {
+                        row.appendChild(wrapper);
+                        row.appendChild(btnDelete); // Lixeira vem depois do balão na esquerda
+                    }
+                    
+                    msgArea.appendChild(row);
+                    msgArea.scrollTop = msgArea.scrollHeight; 
+                }
             } catch (erro) {
-                console.error("Erro ao buscar dados:", erro);
+                console.error("Erro ao sincronizar dados:", erro);
             }
         }
 
@@ -413,7 +488,6 @@
             }
         }
 
-        // Sistema de gravação com travas de segurança contra travamentos de tela
         async function toggleAudioRecord() {
             const btnAudio = document.getElementById('btn-audio');
             if(!btnAudio) return;
@@ -447,7 +521,7 @@
                     btnAudio.innerText = "🛑";
                     btnAudio.classList.add('recording');
                 } catch (err) {
-                    alert("Por favor, permita o acesso ao microfone nas configurações do seu navegador.");
+                    alert("Acesse as configurações do seu navegador e permita o uso do microfone.");
                     console.error(err);
                 }
             } else {
